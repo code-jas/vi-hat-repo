@@ -27,7 +27,7 @@ class Detect:
        self.opt = argparse.Namespace(agnostic_nms=False, 
                                      augment=False, 
                                      classes=None, 
-                                     conf_thres=0.25, 
+                                     conf_thres=0.40,
                                      device='',
                                      exist_ok=False, 
                                      img_size=640, 

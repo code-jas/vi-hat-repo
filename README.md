@@ -1,5 +1,6 @@
-# Changes
+Forked from ppogg - here is the repo: https://github.com/ppogg/YOLOv5-Lite
 
+# Changes
 CCTV - Delayed real-time object detection the more time we run the model the more it delays.
 Fix: https://github.com/ultralytics/yolov5/issues/4465#issuecomment-1113038325
 
@@ -16,4 +17,3 @@ def forward(self, input: Tensor) -> Tensor:
         return F.interpolate(input, self.size, self.scale_factor, self.mode, self.align_corners)
 `
 
-Forked from ppogg - here is the repo: https://github.com/ppogg/YOLOv5-Lite

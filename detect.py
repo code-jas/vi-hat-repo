@@ -7,7 +7,7 @@ import torch
 import torch.backends.cudnn as cudnn
 import threading
 
-from flask import Flask, request
+# from flask import Flask, request
 from numpy import random
 
 from models.experimental import attempt_load
@@ -55,15 +55,12 @@ class Detect:
         # self.CONFIDENCE_THRESHOLD = 0.4
         # self.NMS_THRESHOLD = 0.3
         self.distance = 0
-        self.haptics = 'off'
+
         engine.stop()
 
     def focalLength(self, width_in_rf):
         focal_length = (width_in_rf * self.KNOWN_DISTANCE) / self.PERSON_WIDTH
         return focal_length
-
-    def get_haptics(self):
-        return self.haptics
 
     def distanceEstimate(self, focal_length, width_in_rf):
         distance = (focal_length * self.KNOWN_DISTANCE) / width_in_rf
@@ -208,10 +205,7 @@ class Detect:
                             else:
                                 positionInFrame = "center"
                                 detected_area.append("center")
-                            # urlPos = "http://127.0.0.1:5000/api/haptics/" + positionInFrame
-                            # print(urlPos)
-                            # response = request.get("http://127.0.0.1:5000/api/haptics/" + positionInFrame)
-                            # print (response.text)
+
                             self.label = f'{names[int(cls)]} {int(cls)}'
                             # print width
                             # print(f'width: {self.width_in_rf} label: {self.label}')
@@ -231,12 +225,7 @@ class Detect:
                                         detected_classes.append(
                                             names[int(cls)])
                                         detected_distance.append(self.distance)
-                                        # print(detected_area[i])
-                                        self.haptics = ''.join(
-                                            detected_area[i])
-                                        print("SELF", self.haptics)
-                                        # response = request.get('http://127.0.0.1:5000/' + self.haptics + '/')
-                                        # print(response.content)
+
                                         label = f'{names[int(cls)]} {conf:.2f} {self.distance:.2f} cm'
                                         colors[int(cls)] = [0, 0, 255]
                                         plot_one_box(

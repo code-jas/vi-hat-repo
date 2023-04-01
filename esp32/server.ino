@@ -11,6 +11,7 @@ WiFiServer server(80);
 // Variable to store the HTTP request
 String header;
 
+const int vibMotor = 26;
 
 void setup() {
   Serial.begin(115200);
@@ -24,6 +25,8 @@ void setup() {
   IPAddress IP = WiFi.softAPIP();
   Serial.print("AP IP address: ");
   Serial.println(IP);
+
+  pinMode(vibMotor,OUTPUT);
   
   server.begin();
 }
@@ -51,11 +54,10 @@ void loop(){
             // turns the GPIOs on and off
             if (header.indexOf("GET /right/active") >= 0) {
               Serial.println("right active");
-              output26State = "on";
               jsonResponse = "{\"right\": \"active\"}";
+              activateMotor();
             } else if (header.indexOf("GET /right/inactive") >= 0) {
               Serial.println("right inactive");
-              output26State = "off";
               jsonResponse = "{\"right\": \"inactive\"}";
             } 
             
@@ -87,4 +89,11 @@ void loop(){
     Serial.println("Client disconnected.");
     Serial.println("");
   }
+}
+
+
+void activateMotor(){
+   digitalWrite(vibMotor, HIGH);
+   delay(200);
+   digitalWrite(vibMotor, LOW);
 }

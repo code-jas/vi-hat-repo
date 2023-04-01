@@ -11,6 +11,8 @@ IPAddress subnet(255, 255, 255, 0);   // Set your subnet mask
 String jsonResponse;
 WiFiServer server(80);
 
+const int vibMotor = 26;
+
 void setup() {
   Serial.begin(115200);
   delay(1000);
@@ -23,7 +25,7 @@ void setup() {
     delay(100);
   }
 
-  WiFi.config(local_IP, gateway, subn
+  WiFi.config(local_IP, gateway, subnet);
 
   Serial.println("\nConnected to the WiFi network");
   Serial.print("[+] ESP32 IP: ");
@@ -43,9 +45,11 @@ void loop() {
         if (line.startsWith("GET /left/active")) {
           Serial.println("left active");
           jsonResponse = "{\"left\": \"active\"}";
+          activateMotor();
         } else if (line.startsWith("GET /left/inactive")) {
           Serial.println("left inactive");
           jsonResponse = "{\"left\": \"inactive\"}";
+          
         }
         break;
       }
@@ -61,4 +65,10 @@ void loop() {
     client.println(jsonResponse);
 
   }
+}
+
+void activateMotor(){
+   digitalWrite(vibMotor, HIGH);
+   delay(200);
+   digitalWrite(vibMotor, LOW);
 }

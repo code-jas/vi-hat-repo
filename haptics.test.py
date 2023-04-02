@@ -1,13 +1,61 @@
 import requests
+import threading 
+import asyncio
+import aiohttp
+import time
 
-state = input('Enter state: ')
+def left():
+    get = requests.get("http://192.168.4.4/left/active")
 
-if state == 'r-active':
-   requests.get('http://192.168.4.1/right/active')
-elif state == 'r-inactive':
-   requests.get('http://192.168.4.1/right/active')
-   
-if state == 'l-active':
-   requests.get('http://192.168.4.4/left/active')
-elif state == 'l-inactive':
-   requests.get('http://192.168.4.4/left/inactive')
+def right():
+    get = requests.get("http://192.168.4.1/right/active")
+
+async def make_request(url, delay):
+    await asyncio.sleep(delay)
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            return await response.text()
+
+
+async def main_req():
+    req1 = "http://192.168.4.1/right/active"
+    req2 = "http://192.168.4.4/left/active"
+    tasks = [
+        asyncio.create_task(make_request(req1, 0.2)),
+        asyncio.create_task(make_request(req2, 0))
+    ]
+    result = await asyncio.gather(*tasks)
+    print(result)
+
+while(True):
+
+    state = input('input state: \n')
+
+    if state == 'r':
+        get = requests.get("http://192.168.4.1/right/active")
+
+    if state == 'l':
+        get = requests.get("http://192.168.4.4/left/active")
+
+    if state == 'lr':
+        tts_thread_l = threading.Thread(target=left)
+        tts_thread_r = threading.Thread(target=right)
+        tts_thread_l.start()
+        tts_thread_r.start()
+
+    if state == 'rl':
+        # get = requests.get("http://192.168.4.1/right/active")
+        # get = requests.get("http://192.168.4.4/left/active")
+        asyncio.run(main_req())
+
+
+    if state == 'q':
+        break
+
+    print('\n')
+
+
+
+
+
+

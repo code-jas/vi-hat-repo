@@ -16,6 +16,7 @@ from utils.general import check_img_size, check_requirements, check_imshow, non_
     scale_coords, xyxy2xywh, strip_optimizer, set_logging, increment_path
 from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized
+from utils.vi_hat import *
 
 engine = pyttsx3.init()
 voice = engine.getProperty('voices')  # get the available voices
@@ -31,8 +32,8 @@ class Detect:
             weights='weights/v5lite-s.pt',
             source='sample',
             img_size=640,
-            conf_thres=0.45,
-            iou_thres=0.5,
+            conf_thres=0.40,
+            iou_thres=0.40,
             device='',
             view_img=False,
             save_txt=False,
@@ -56,6 +57,10 @@ class Detect:
         # self.NMS_THRESHOLD = 0.3
         self.distance = 0
 
+        self.detected_classes = []
+        self.detected_distance = []
+        self.detected_area = []
+
         engine.stop()
 
     def focalLength(self, width_in_rf):
@@ -67,6 +72,26 @@ class Detect:
         # convert inches to feet
         # distance = distance / 12
         return distance
+
+    def get_bounding_box_position(self, xyxy, im0):
+        # Get the x-coordinate of the center of the bounding box
+        bbox_center = (xyxy[0] + xyxy[2]) / 2
+        # Get the x-coordinate of the center of the image
+        image_center = im0.shape[1] / 2
+
+        # Determine if the bounding box is on the left, center, or right of the image
+        if bbox_center < image_center - 50:
+            #positionInFrame = "left"
+            self.detected_area.append("left")
+            requests.get("http://192.168.4.1/right/active")
+        elif bbox_center > image_center + 50:
+            #positionInFrame = "right"
+            self.detected_area.append("right")
+            requests.get("http://192.168.4.4/left/active")
+        else:
+            #positionInFrame = "center"
+            self.detected_area.append("center")
+            asyncio.run(main_req())
 
     def speak_warning(self, str):
         if not engine._inLoop:
@@ -157,14 +182,11 @@ class Detect:
                 txt_path = str(save_dir / 'labels' / p.stem) + \
                     ('' if dataset.mode == 'image' else f'_{frame}')  # img.txt
                 s += '%gx%g ' % img.shape[2:]  # print string
-
                 # normalization gain whwh
                 gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]
                 if len(det):
                     # Rescale boxes from img_size to im0 size
-                    detected_classes = []
-                    detected_distance = []
-                    detected_area = []
+
                     det[:, :4] = scale_coords(
                         img.shape[2:], det[:, :4], im0.shape).round()
 
@@ -190,21 +212,7 @@ class Detect:
                             label = f'{names[int(cls)]} {conf:.2f}'
                             # get the width and height of the bounding box
                             self.width_in_rf = xyxy[2] - xyxy[0]
-                            # Get the x-coordinate of the center of the bounding box
-                            bbox_center = (xyxy[0] + xyxy[2]) / 2
-                            # Get the x-coordinate of the center of the image
-                            image_center = im0.shape[1] / 2
-
-                            # Determine if the bounding box is on the left, center, or right of the image
-                            if bbox_center < image_center - 50:
-                                positionInFrame = "left"
-                                detected_area.append("left")
-                            elif bbox_center > image_center + 50:
-                                positionInFrame = "right"
-                                detected_area.append("right")
-                            else:
-                                positionInFrame = "center"
-                                detected_area.append("center")
+                            self.get_bounding_box_position(xyxy, im0)
 
                             self.label = f'{names[int(cls)]} {int(cls)}'
                             # print width
@@ -215,25 +223,27 @@ class Detect:
                                 if names[int(cls)] == 'person':
                                     self.distance = self.distanceEstimate(
                                         focal_person, self.width_in_rf)
-                                elif names[int(cls)] == 'cell phone':
+                                elif names[int(cls)] == 'dog':
                                     self.distance = self.distanceEstimate(
-                                        focal_phone, self.width_in_rf)
+                                        focal_dog, self.width_in_rf)
 
                                 if self.distance < 180:
                                     # set colors to red
                                     if self.distance < 80:
-                                        detected_classes.append(
-                                            names[int(cls)])
-                                        detected_distance.append(self.distance)
+                                        self.detected_classes.append(
+                                            f'{int(cls)} : {names[int(cls)]}')
+                                        self.detected_distance.append(
+                                            self.distance)
 
                                         label = f'{names[int(cls)]} {conf:.2f} {self.distance:.2f} cm'
                                         colors[int(cls)] = [0, 0, 255]
                                         plot_one_box(
                                             xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
                                     else:
-                                        detected_classes.append(
+                                        self.detected_classes.append(
                                             names[int(cls)])
-                                        detected_distance.append(self.distance)
+                                        self.detected_distance.append(
+                                            self.distance)
                                         label = f'{names[int(cls)]} {conf:.2f} {self.distance:.2f} cm'
                                         colors[int(cls)] = [0, 255, 0]
                                         plot_one_box(
@@ -241,15 +251,15 @@ class Detect:
 
                     # Construct detected_string
                     distance_strings = [f"is too close to you" if distance <
-                                        3 else f"{round(float(distance), 1)} feet away" for distance in detected_distance]
-                    position_strings = ["on your left" if detected_area[i] == 'left' else "in front of you" if detected_area[i]
-                                        == 'center' else "on your right" for i in range(len(detected_area))]
+                                        3 else f"{round(float(distance), 1)} cm away" for distance in self.detected_distance]
+                    position_strings = ["on your left" if self.detected_area[i] == 'left' else "in front of you" if self.detected_area[i]
+                                        == 'center' else "on your right" for i in range(len(self.detected_area))]
 
                     detected_string = ", ".join(
-                        [f"{clazz} {distance_strings[i]} {position_strings[i]}" for i, clazz in enumerate(detected_classes)])
+                        [f"{clazz} {distance_strings[i]} {position_strings[i]}" for i, clazz in enumerate(self.detected_classes)])
 
                     # Construct speech output
-                    if len(detected_classes) == 1:
+                    if len(self.detected_classes) == 1:
                         speech = f"I detected a {detected_string}."
                     else:
                         speech = f"I detected multiple objects. {detected_string}."
@@ -299,7 +309,7 @@ class Detect:
 
         print(f'Done. ({time.time() - t0:.3f}s)')
 
-    def conf(self, weights, source, classes, read, view_img):
+    def conf(self, weights='weights/v5lite-g.pt', source='0', classes=0, read=False, view_img=False):
         self.opt.weights = weights
         self.opt.source = source
         self.opt.classes = classes
@@ -312,26 +322,36 @@ focal_phone = None
 
 
 def inference():
-    global focal_person, focal_phone
-    obs = Detect()
+    global focal_person, focal_dog
 
-    obs.conf('weights/v5lite-s.pt', 'ref/50.jpg', 0, True, False)
+    obs = Detect()  # initialize detector
+    # configure for person
+    obs.conf(
+        weights='weights/v5lite-g.pt',
+        source='ref/50.jpg',
+        classes=0,
+        read=True)
     obs.detect()
     person, plabel = obs.width_in_rf, obs.label
 
-    obs.conf('weights/v5lite-s.pt', 'ref/dog50.jpg', 17, True, False)
+    # configure for phone
+    obs.conf(
+        weights='weights/v5lite-g.pt',
+        source='ref/dog50.jpg',
+        classes=16,
+        read=True)
     obs.detect()
-    phone, phLabel = obs.width_in_rf, obs.label
+    dog, phLabel = obs.width_in_rf, obs.label
 
-    print(f'{plabel}: {person} | {phLabel}: {phone}')
+    print(f'{plabel}: {person} | {phLabel}: {dog}')
     # person 0: 671.0 | person 0: 671.0
     focal_person = obs.focalLength(person)  # 402
-    focal_phone = obs.focalLength(phone)  # 402
+    focal_dog = obs.focalLength(dog)  # 402
 
     print(
-        f'focal length of person: {focal_person} | focal length of phone: {focal_phone}')
+        f'focal length of person: {focal_person} | focal length of dog: {focal_dog}')
 
-    obs.conf('weights/v5lite-s.pt', '0', None, False, False)
+    obs.conf(classes=[0, 16])
 
     obs.detect()
 

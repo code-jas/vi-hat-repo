@@ -1,14 +1,17 @@
 import requests
-import threading 
+import threading
 import asyncio
 import aiohttp
 import time
 
+
 def left():
     get = requests.get("http://192.168.4.4/left/active")
 
+
 def right():
     get = requests.get("http://192.168.4.1/right/active")
+
 
 async def make_request(url, delay):
     await asyncio.sleep(delay)
@@ -37,25 +40,10 @@ while(True):
     if state == 'l':
         get = requests.get("http://192.168.4.4/left/active")
 
-    if state == 'lr':
-        tts_thread_l = threading.Thread(target=left)
-        tts_thread_r = threading.Thread(target=right)
-        tts_thread_l.start()
-        tts_thread_r.start()
-
     if state == 'rl':
-        # get = requests.get("http://192.168.4.1/right/active")
-        # get = requests.get("http://192.168.4.4/left/active")
         asyncio.run(main_req())
-
 
     if state == 'q':
         break
 
     print('\n')
-
-
-
-
-
-

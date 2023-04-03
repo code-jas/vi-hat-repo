@@ -6,7 +6,10 @@ import cv2
 import torch
 import torch.backends.cudnn as cudnn
 import threading
+import asyncio
 
+
+import requests
 # from flask import Flask, request
 from numpy import random
 
@@ -16,7 +19,7 @@ from utils.general import check_img_size, check_requirements, check_imshow, non_
     scale_coords, xyxy2xywh, strip_optimizer, set_logging, increment_path
 from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized
-from utils.vi_hat import *
+from utils.vi_hat import main_req
 
 engine = pyttsx3.init()
 voice = engine.getProperty('voices')  # get the available voices
@@ -83,15 +86,15 @@ class Detect:
         if bbox_center < image_center - 50:
             #positionInFrame = "left"
             self.detected_area.append("left")
-            requests.get("http://192.168.4.1/right/active")
+            # requests.get("http://192.168.4.1/right/active")
         elif bbox_center > image_center + 50:
             #positionInFrame = "right"
             self.detected_area.append("right")
-            requests.get("http://192.168.4.4/left/active")
+            # requests.get("http://192.168.4.4/left/active")
         else:
             #positionInFrame = "center"
             self.detected_area.append("center")
-            asyncio.run(main_req())
+            # asyncio.run(main_req())
 
     def speak_warning(self, str):
         if not engine._inLoop:
@@ -258,12 +261,35 @@ class Detect:
                     detected_string = ", ".join(
                         [f"{clazz} {distance_strings[i]} {position_strings[i]}" for i, clazz in enumerate(self.detected_classes)])
 
-                    # Construct speech output
-                    if len(self.detected_classes) == 1:
-                        speech = f"I detected a {detected_string}."
-                    else:
-                        speech = f"I detected multiple objects. {detected_string}."
-                    print(f'Speech: {speech}')
+                    if len(detected_string) > 0:
+                        for position in self.detected_area:
+                            if position == "left":
+                                print("Left")
+                                requests.get("http://192.168.4.4/left/active")
+                            elif position == "right":
+                                print("Right")
+                                requests.get("http://192.168.4.1/right/active")
+                            else:
+                                print("Center")
+                                main_req()
+                        if len(self.detected_classes) > 0:
+                            speech = f"I detected a {detected_string}."
+                        else:
+                            speech = f"I detected a {detected_string}."
+
+                        print(f'Speech: {speech}')
+
+                        # Start a new thread to run the speak_warning function
+                        # tts_thread = threading.Thread(
+                        #     target=self.speak_warning, args=(speech, engine,))
+                        # tts_thread.start()
+
+                    # # Construct speech output
+                    # if len(self.detected_classes) == 1:
+                    #     speech = f"I detected a {detected_string}."
+                    # else:
+                    #     speech = f"I detected multiple objects. {detected_string}."
+                    # print(f'Speech: {speech}')
 
                     # Start a new thread to run the speak_warning function
 
@@ -309,7 +335,7 @@ class Detect:
 
         print(f'Done. ({time.time() - t0:.3f}s)')
 
-    def conf(self, weights='weights/v5lite-g.pt', source='0', classes=0, read=False, view_img=False):
+    def conf(self, weights='weights/v5lite-g.pt', source='0', classes=None, read=False, view_img=False):
         self.opt.weights = weights
         self.opt.source = source
         self.opt.classes = classes
@@ -351,7 +377,8 @@ def inference():
     print(
         f'focal length of person: {focal_person} | focal length of dog: {focal_dog}')
 
-    obs.conf(classes=[0, 16])
+    obs.conf(weights='weights/wpn-v3.pt',
+             source='rtsp://admin:wcm_2000@192.168.1.64:554/Streaming/Channels/2')
 
     obs.detect()
 

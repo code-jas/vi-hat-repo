@@ -1,8 +1,5 @@
-import requests
-import threading
 import asyncio
 import aiohttp
-import time
 
 
 async def make_request(url, delay):

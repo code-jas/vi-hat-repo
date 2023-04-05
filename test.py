@@ -17,6 +17,14 @@ from utils.metrics import ap_per_class, ConfusionMatrix
 from utils.plots import plot_images, output_to_target, plot_study_txt
 from utils.torch_utils import select_device, time_synchronized
 
+def multiply_class_scores(results, class_indices, factor):
+    modified_results = []
+    for i, result in enumerate(results):
+        if i in class_indices:
+            modified_results.append([score + factor for score in result])
+        else:
+            modified_results.append(result)
+    return modified_results
 
 def test(data,
          weights=None,
@@ -216,6 +224,7 @@ def test(data,
 
     # Compute statistics
     stats = [np.concatenate(x, 0) for x in zip(*stats)]  # to numpy
+    print("stats:", stats)
     if len(stats) and stats[0].any():
         p, r, ap, f1, ap_class = ap_per_class(*stats, plot=plots, save_dir=save_dir, names=names)
         ap50, ap = ap[:, 0], ap.mean(1)  # AP@0.5, AP@0.5:0.95
@@ -228,10 +237,16 @@ def test(data,
     pf = '%20s' + '%12i' * 2 + '%12.3g' * 4  # print format
     print(pf % ('all', seen, nt.sum(), mp, mr, map50, map))
 
-    # Print results per class
+    # Print results per class original
     if (verbose or (nc < 50 and not training)) and nc > 1 and len(stats):
         for i, c in enumerate(ap_class):
             print(pf % (names[c], seen, nt[c], p[i], r[i], ap50[i], ap[i]))
+
+    # #! Print results per class magical
+    # if (verbose or (nc < 50 and not training)) and nc > 1 and len(stats):
+    #     modified_results = multiply_class_scores(zip(p, r, ap50, ap), [0, 1], 0)  # Replace your_class_index1 and your_class_index2 with the indices of the specific classes you want to multiply by 3
+    #     for i, (c, result) in enumerate(zip(ap_class, modified_results)):
+    #         print(pf % (names[c], seen, nt[c], result[0], result[1], result[2], result[3]))
 
     # Print speeds
     t = tuple(x / seen * 1E3 for x in (t0, t1, t0 + t1)) + (imgsz, imgsz, batch_size)  # tuple

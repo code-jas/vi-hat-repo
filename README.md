@@ -20,3 +20,8 @@ def forward(self, input: Tensor) -> Tensor:
 Update Tracker
 Detect.py: 
 #line 76 add getboundingboxPosition 
+
+
+
+Test
+python test.py --weights weights/vih-model.pt --data vih-dataset/data.yaml --verbose --name addPerClass

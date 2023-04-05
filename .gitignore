@@ -6,3 +6,4 @@ utils/wandb_logging/__pycache__
 wandb
 test/       
 runs/
+vih-dataset/

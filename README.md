@@ -17,9 +17,10 @@ def forward(self, input: Tensor) -> Tensor:
         return F.interpolate(input, self.size, self.scale_factor, self.mode, self.align_corners)
 `
 
-Update Tracker
+Fixed Distance Estimation
 Detect.py: 
-#line 76 add getboundingboxPosition 
+added width per class
+#line 310 added read focal method
 
 
 

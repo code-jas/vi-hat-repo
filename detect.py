@@ -60,9 +60,9 @@ class Detect:
         # self.NMS_THRESHOLD = 0.3
         self.distance = 0
 
-        self.detected_classes = []
-        self.detected_distance = []
-        self.detected_area = []
+        # self.detected_classes = []
+        # self.detected_distance = []
+        # self.detected_area = []
 
         engine.stop()
 
@@ -76,25 +76,25 @@ class Detect:
         # distance = distance / 12
         return distance
 
-    def get_bounding_box_position(self, xyxy, im0):
-        # Get the x-coordinate of the center of the bounding box
-        bbox_center = (xyxy[0] + xyxy[2]) / 2
-        # Get the x-coordinate of the center of the image
-        image_center = im0.shape[1] / 2
+    # def get_bounding_box_position(self, xyxy, im0):
+    #     # Get the x-coordinate of the center of the bounding box
+    #     bbox_center = (xyxy[0] + xyxy[2]) / 2
+    #     # Get the x-coordinate of the center of the image
+    #     image_center = im0.shape[1] / 2
 
-        # Determine if the bounding box is on the left, center, or right of the image
-        if bbox_center < image_center - 50:
-            #positionInFrame = "left"
-            self.detected_area.append("left")
-            # requests.get("http://192.168.4.1/right/active")
-        elif bbox_center > image_center + 50:
-            #positionInFrame = "right"
-            self.detected_area.append("right")
-            # requests.get("http://192.168.4.4/left/active")
-        else:
-            #positionInFrame = "center"
-            self.detected_area.append("center")
-            # asyncio.run(main_req())
+    #     # Determine if the bounding box is on the left, center, or right of the image
+    #     if bbox_center < image_center - 50:
+    #         #positionInFrame = "left"
+    #         self.detected_area.append("left")
+    #         # requests.get("http://192.168.4.1/right/active")
+    #     elif bbox_center > image_center + 50:
+    #         #positionInFrame = "right"
+    #         self.detected_area.append("right")
+    #         # requests.get("http://192.168.4.4/left/active")
+    #     else:
+    #         #positionInFrame = "center"
+    #         self.detected_area.append("center")
+    #         # asyncio.run(main_req())
 
     def speak_warning(self, str):
         if not engine._inLoop:
@@ -189,7 +189,10 @@ class Detect:
                 gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]
                 if len(det):
                     # Rescale boxes from img_size to im0 size
-
+                    detected_classes = []
+                    detected_distance = []
+                    detected_area = []
+                    
                     det[:, :4] = scale_coords(
                         img.shape[2:], det[:, :4], im0.shape).round()
 
@@ -211,16 +214,28 @@ class Detect:
                                 f.write(('%g ' * len(line)).rstrip() %
                                         line + '\n')
 
-                        if save_img or view_img:  # Add bbox to image
-                            label = f'{names[int(cls)]} {conf:.2f}'
-                            # get the width and height of the bounding box
-                            self.width_in_rf = xyxy[2] - xyxy[0]
-                            self.get_bounding_box_position(xyxy, im0)
+                            if save_img or view_img:  # Add bbox to image
+                                label = f'{names[int(cls)]} {conf:.2f}'
+                                # get the width and height of the bounding box
+                                self.width_in_rf = xyxy[2] - xyxy[0]
+                                # Get the x-coordinate of the center of the bounding box
+                                bbox_center = (xyxy[0] + xyxy[2]) / 2
+                                # Get the x-coordinate of the center of the image
+                                image_center = im0.shape[1] / 2
 
-                            self.label = f'{names[int(cls)]} {int(cls)}'
-                            # print width
-                            # print(f'width: {self.width_in_rf} label: {self.label}')
-
+                                # Determine if the bounding box is on the left, center, or right of the image
+                                if bbox_center < image_center - 50:
+                                    positionInFrame = "left"
+                                    detected_area.append("left")
+                                elif bbox_center > image_center + 50:
+                                    positionInFrame = "right"
+                                    detected_area.append("right")
+                                else:
+                                    positionInFrame = "center"
+                                    detected_area.append("center")
+                    
+                                self.label = f'{names[int(cls)]} {int(cls)}'
+                  
                             if (self.opt.read == False):
 
                                 if names[int(cls)] == 'person':
@@ -233,9 +248,9 @@ class Detect:
                                 if self.distance < 180:
                                     # set colors to red
                                     if self.distance < 80:
-                                        self.detected_classes.append(
+                                        detected_classes.append(
                                             f'{int(cls)} : {names[int(cls)]}')
-                                        self.detected_distance.append(
+                                        detected_distance.append(
                                             self.distance)
 
                                         label = f'{names[int(cls)]} {conf:.2f} {self.distance:.2f} cm'
@@ -243,9 +258,9 @@ class Detect:
                                         plot_one_box(
                                             xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
                                     else:
-                                        self.detected_classes.append(
+                                        detected_classes.append(
                                             names[int(cls)])
-                                        self.detected_distance.append(
+                                        detected_distance.append(
                                             self.distance)
                                         label = f'{names[int(cls)]} {conf:.2f} {self.distance:.2f} cm'
                                         colors[int(cls)] = [0, 255, 0]
@@ -254,25 +269,26 @@ class Detect:
 
                     # Construct detected_string
                     distance_strings = [f"is too close to you" if distance <
-                                        3 else f"{round(float(distance), 1)} cm away" for distance in self.detected_distance]
-                    position_strings = ["on your left" if self.detected_area[i] == 'left' else "in front of you" if self.detected_area[i]
-                                        == 'center' else "on your right" for i in range(len(self.detected_area))]
-
+                                        3 else f"{round(float(distance), 1)} cm away" for distance in detected_distance]
+                    position_strings = ["on your left" if detected_area[i] == 'left' else "in front of you" if detected_area[i]
+                                        == 'center' else "on your right" for i in range(len(detected_area))]
                     detected_string = ", ".join(
-                        [f"{clazz} {distance_strings[i]} {position_strings[i]}" for i, clazz in enumerate(self.detected_classes)])
+                        [f"{clazz} {distance_strings[i]} {position_strings[i]}" for i, clazz in enumerate(detected_classes)])
+                    
+            
 
                     if len(detected_string) > 0:
-                        for position in self.detected_area:
+                        for position in detected_area:
                             if position == "left":
                                 print("Left")
-                                requests.get("http://192.168.4.4/left/active")
+                                # requests.get("http://192.168.4.4/left/active")
                             elif position == "right":
                                 print("Right")
-                                requests.get("http://192.168.4.1/right/active")
+                                # requests.get("http://192.168.4.1/right/active")
                             else:
                                 print("Center")
-                                main_req()
-                        if len(self.detected_classes) > 0:
+                                # main_req()
+                        if len(detected_classes) > 0:
                             speech = f"I detected a {detected_string}."
                         else:
                             speech = f"I detected a {detected_string}."
@@ -280,24 +296,13 @@ class Detect:
                         print(f'Speech: {speech}')
 
                         # Start a new thread to run the speak_warning function
-                        # tts_thread = threading.Thread(
-                        #     target=self.speak_warning, args=(speech, engine,))
-                        # tts_thread.start()
+                        tts_thread = threading.Thread(
+                            target=self.speak_warning, args=(speech, engine,))
+                        tts_thread.start()
 
-                    # # Construct speech output
-                    # if len(self.detected_classes) == 1:
-                    #     speech = f"I detected a {detected_string}."
-                    # else:
-                    #     speech = f"I detected multiple objects. {detected_string}."
-                    # print(f'Speech: {speech}')
-
-                    # Start a new thread to run the speak_warning function
-
-                    # tts_thread = threading.Thread(target=self.speak_warning, args=(speech,))
-                    # tts_thread.start()
-
+               
                 # Print time (inference + NMS)
-                # print(f'{s}Done. ({t2 - t1:.3f}s)')``
+                print(f'{s}Done. ({t2 - t1:.3f}s)')
 
                 # Stream results
                 if view_img:
@@ -377,8 +382,9 @@ def inference():
     print(
         f'focal length of person: {focal_person} | focal length of dog: {focal_dog}')
 
-    obs.conf(weights='weights/wpn-v3.pt',
-             source='rtsp://admin:wcm_2000@192.168.1.64:554/Streaming/Channels/2')
+    # obs.conf(weights='weights/wpn-v3.pt',
+    #          source='rtsp://admin:wcm_2000@192.168.1.64:554/Streaming/Channels/2')
+    obs.conf(weights='weights/wpn-v3.pt', source='https://192.168.1.46:8080/video')
 
     obs.detect()
 

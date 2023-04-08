@@ -349,7 +349,7 @@ def inference():
     print(f'Bicycle focal length: {focal_bicycle}')
     print(f'Bicycle width: {bicycle_width_px}')
     
-    obs.config('weights/vig-model.pt', 'test_2.mp4', [0,1,2,13,15,16], False, True)
+    obs.config('weights/v5lite-s.pt', 'test_2.mp4', [0,1,2,13,15,16], False, True)
 
     obs.detect()
 

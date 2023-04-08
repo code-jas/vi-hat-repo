@@ -1,16 +1,10 @@
 import argparse
 import time
 from pathlib import Path
-import pyttsx3
 import cv2
 import torch
 import torch.backends.cudnn as cudnn
-import threading
-import asyncio
 
-
-import requests
-# from flask import Flask, request
 from numpy import random
 
 from models.experimental import attempt_load
@@ -19,14 +13,16 @@ from utils.general import check_img_size, check_requirements, check_imshow, non_
     scale_coords, xyxy2xywh, strip_optimizer, set_logging, increment_path
 from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized
+
+import pyttsx3
 from utils.vi_hat import main_req
+import requests
+import threading
 
 engine = pyttsx3.init()
 voice = engine.getProperty('voices')  # get the available voices
-# eng.setProperty('voice', voice[0].id) #set the voice to index 0 for male voice
-# changing voice to index 1 for female voice
 engine.setProperty('voice', voice[1].id)
-
+engine.say("Hello, I am Vi-Hat. I am ready to help you.")
 
 class Detect:
     def __init__(self):
@@ -35,8 +31,8 @@ class Detect:
             weights='weights/v5lite-s.pt',
             source='sample',
             img_size=640,
-            conf_thres=0.40,
-            iou_thres=0.40,
+            conf_thres=0.45,
+            iou_thres=0.2,
             device='',
             view_img=False,
             save_txt=False,
@@ -53,48 +49,27 @@ class Detect:
         )
         self.width_in_rf = 0
         self.label = ''
-        self.KNOWN_DISTANCE = 24.0
+        self.KNOWN_DISTANCE = 25.0
         self.PERSON_WIDTH = 40
-        # self.MOBILE_WIDTH = 3.0
-        # self.CONFIDENCE_THRESHOLD = 0.4
-        # self.NMS_THRESHOLD = 0.3
+        self.DOG_WIDTH = 55
+        self.CAR_WIDTH = 10
+        self.CAT_WIDTH = 30
+        self.BICYCLE_WIDTH = 55
+        self.BENCH_WIDTH = 100
+        self.CONFIDENCE_THRESHOLD = 0.4
+        self.NMS_THRESHOLD = 0.3
         self.distance = 0
 
-        self.detected_classes = []
-        self.detected_distance = []
-        self.detected_area = []
-
-        engine.stop()
-
-    def focalLength(self, width_in_rf):
-        focal_length = (width_in_rf * self.KNOWN_DISTANCE) / self.PERSON_WIDTH
+    def focalLength(self, width_in_rf, width):
+        focal_length = (width_in_rf * self.KNOWN_DISTANCE) / width
         return focal_length
 
     def distanceEstimate(self, focal_length, width_in_rf):
         distance = (focal_length * self.KNOWN_DISTANCE) / width_in_rf
-        # convert inches to feet
-        # distance = distance / 12
+        
+        distance = distance / 100
+        
         return distance
-
-    def get_bounding_box_position(self, xyxy, im0):
-        # Get the x-coordinate of the center of the bounding box
-        bbox_center = (xyxy[0] + xyxy[2]) / 2
-        # Get the x-coordinate of the center of the image
-        image_center = im0.shape[1] / 2
-
-        # Determine if the bounding box is on the left, center, or right of the image
-        if bbox_center < image_center - 50:
-            #positionInFrame = "left"
-            self.detected_area.append("left")
-            # requests.get("http://192.168.4.1/right/active")
-        elif bbox_center > image_center + 50:
-            #positionInFrame = "right"
-            self.detected_area.append("right")
-            # requests.get("http://192.168.4.4/left/active")
-        else:
-            #positionInFrame = "center"
-            self.detected_area.append("center")
-            # asyncio.run(main_req())
 
     def speak_warning(self, str):
         if not engine._inLoop:
@@ -185,11 +160,14 @@ class Detect:
                 txt_path = str(save_dir / 'labels' / p.stem) + \
                     ('' if dataset.mode == 'image' else f'_{frame}')  # img.txt
                 s += '%gx%g ' % img.shape[2:]  # print string
+
                 # normalization gain whwh
                 gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]
                 if len(det):
                     # Rescale boxes from img_size to im0 size
-
+                    detected_classes = []
+                    detected_distance = []
+                    detected_area = []
                     det[:, :4] = scale_coords(
                         img.shape[2:], det[:, :4], im0.shape).round()
 
@@ -215,90 +193,75 @@ class Detect:
                             label = f'{names[int(cls)]} {conf:.2f}'
                             # get the width and height of the bounding box
                             self.width_in_rf = xyxy[2] - xyxy[0]
-                            self.get_bounding_box_position(xyxy, im0)
+                            # Get the x-coordinate of the center of the bounding box
+                            bbox_center = (xyxy[0] + xyxy[2]) / 2
+                            # Get the x-coordinate of the center of the image
+                            image_center = im0.shape[1] / 2
+
+                            # Determine if the bounding box is on the left, center, or right of the image
+                            if bbox_center < image_center - 50:
+                                detected_area.append("left")
+                            elif bbox_center > image_center + 50:
+                                detected_area.append("right")
+                            else:
+                                detected_area.append("center")
 
                             self.label = f'{names[int(cls)]} {int(cls)}'
-                            # print width
-                            # print(f'width: {self.width_in_rf} label: {self.label}')
 
                             if (self.opt.read == False):
 
                                 if names[int(cls)] == 'person':
-                                    self.distance = self.distanceEstimate(
-                                        focal_person, self.width_in_rf)
+                                    self.distance = self.distanceEstimate(focal_person, self.width_in_rf)
                                 elif names[int(cls)] == 'dog':
-                                    self.distance = self.distanceEstimate(
-                                        focal_dog, self.width_in_rf)
-
-                                if self.distance < 180:
+                                    self.distance = self.distanceEstimate(focal_dog, self.width_in_rf)
+                                elif names[int(cls)] == 'cat':
+                                    self.distance = self.distanceEstimate(focal_cat, self.width_in_rf)
+                                elif names[int(cls)] == 'car':
+                                    self.distance = self.distanceEstimate(focal_car, self.width_in_rf)
+                                elif names[int(cls)] == 'bicycle':
+                                    self.distance = self.distanceEstimate(focal_bicycle, self.width_in_rf)
+                                    
+                                if self.distance < 4:
                                     # set colors to red
-                                    if self.distance < 80:
-                                        self.detected_classes.append(
-                                            f'{int(cls)} : {names[int(cls)]}')
-                                        self.detected_distance.append(
-                                            self.distance)
+                                    if self.distance < 2:
+                                        detected_classes.append(names[int(cls)])
+                                        detected_distance.append(self.distance)
 
-                                        label = f'{names[int(cls)]} {conf:.2f} {self.distance:.2f} cm'
+                                        label = f'{names[int(cls)]} {conf:.2f} {self.distance:.2f} m'
                                         colors[int(cls)] = [0, 0, 255]
-                                        plot_one_box(
-                                            xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
+                                        plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
                                     else:
-                                        self.detected_classes.append(
-                                            names[int(cls)])
-                                        self.detected_distance.append(
-                                            self.distance)
-                                        label = f'{names[int(cls)]} {conf:.2f} {self.distance:.2f} cm'
+                                        detected_classes.append(names[int(cls)])
+                                        detected_distance.append(self.distance)
+                                        label = f'{names[int(cls)]} {conf:.2f} {self.distance:.2f} m'
                                         colors[int(cls)] = [0, 255, 0]
-                                        plot_one_box(
-                                            xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
+                                        plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
 
                     # Construct detected_string
-                    distance_strings = [f"is too close to you" if distance <
-                                        3 else f"{round(float(distance), 1)} cm away" for distance in self.detected_distance]
-                    position_strings = ["on your left" if self.detected_area[i] == 'left' else "in front of you" if self.detected_area[i]
-                                        == 'center' else "on your right" for i in range(len(self.detected_area))]
+                    distance_strings = [f"is too close to you" if distance < 2 else f"{round(float(distance), 1)} feet away" for distance in detected_distance]
+                    position_strings = ["on your left" if detected_area[i] == 'left' else "in front of you" if detected_area[i] == 'center' else "on your right" for i in range(len(detected_area))]
 
-                    detected_string = ", ".join(
-                        [f"{clazz} {distance_strings[i]} {position_strings[i]}" for i, clazz in enumerate(self.detected_classes)])
-
-                    if len(detected_string) > 0:
-                        for position in self.detected_area:
+                    detected_string = ", ".join([f"{clazz} {distance_strings[i]} {position_strings[i]}" for i, clazz in enumerate(detected_classes)])
+                    
+                    # Construct speech output
+                    if len(detected_string) > 0: 
+                        for position in detected_area:
                             if position == "left":
                                 print("Left")
-                                requests.get("http://192.168.4.4/left/active")
+                                # requests.get("http://192.168.4.4/left/active")
                             elif position == "right":
                                 print("Right")
-                                requests.get("http://192.168.4.1/right/active")
+                                # requests.get("http://192.168.4.1/right/active")
                             else:
                                 print("Center")
-                                main_req()
-                        if len(self.detected_classes) > 0:
-                            speech = f"I detected a {detected_string}."
-                        else:
-                            speech = f"I detected a {detected_string}."
-
-                        print(f'Speech: {speech}')
-
-                        # Start a new thread to run the speak_warning function
-                        # tts_thread = threading.Thread(
-                        #     target=self.speak_warning, args=(speech, engine,))
-                        # tts_thread.start()
-
-                    # # Construct speech output
-                    # if len(self.detected_classes) == 1:
-                    #     speech = f"I detected a {detected_string}."
-                    # else:
-                    #     speech = f"I detected multiple objects. {detected_string}."
-                    # print(f'Speech: {speech}')
-
-                    # Start a new thread to run the speak_warning function
-
-                    # tts_thread = threading.Thread(target=self.speak_warning, args=(speech,))
-                    # tts_thread.start()
-
-                # Print time (inference + NMS)
-                # print(f'{s}Done. ({t2 - t1:.3f}s)')``
-
+                                # main_req()
+                        if len(detected_classes) > 0:
+                            speech = f"I detected! A {detected_string}"
+                            print(f'Speech: {speech}')
+                            # Start a new thread to run the speak_warning function                    
+                            tts_thread = threading.Thread(target=self.speak_warning, args=(speech,engine))
+                            tts_thread.start()
+                    
                 # Stream results
                 if view_img:
                     cv2.imshow(str(p), im0)
@@ -335,50 +298,56 @@ class Detect:
 
         print(f'Done. ({time.time() - t0:.3f}s)')
 
-    def conf(self, weights='weights/v5lite-g.pt', source='0', classes=None, read=False, view_img=False):
+    def config(self, weights, source, classes, read, view_img):
         self.opt.weights = weights
         self.opt.source = source
         self.opt.classes = classes
         self.opt.read = read
         self.opt.view_img = view_img
+        
+    def read_focal(self, model, src, classes, width):
 
+        self.config(model, src, classes, True, False)
 
-focal_person = None
-focal_phone = None
+        self.detect()
 
+        focal_length = self.focalLength(self.width_in_rf, width)
+
+        return self.width_in_rf, focal_length
+
+focal_person = 0
+focal_dog = 0
+focal_cat = 0
+focal_car = 0
+focal_bicycle = 0
 
 def inference():
-    global focal_person, focal_dog
-
-    obs = Detect()  # initialize detector
-    # configure for person
-    obs.conf(
-        weights='weights/v5lite-g.pt',
-        source='ref/50.jpg',
-        classes=0,
-        read=True)
-    obs.detect()
-    person, plabel = obs.width_in_rf, obs.label
-
-    # configure for phone
-    obs.conf(
-        weights='weights/v5lite-g.pt',
-        source='ref/dog50.jpg',
-        classes=16,
-        read=True)
-    obs.detect()
-    dog, phLabel = obs.width_in_rf, obs.label
-
-    print(f'{plabel}: {person} | {phLabel}: {dog}')
-    # person 0: 671.0 | person 0: 671.0
-    focal_person = obs.focalLength(person)  # 402
-    focal_dog = obs.focalLength(dog)  # 402
-
-    print(
-        f'focal length of person: {focal_person} | focal length of dog: {focal_dog}')
-
-    obs.conf(weights='weights/wpn-v3.pt',
-             source='rtsp://admin:wcm_2000@192.168.1.64:554/Streaming/Channels/2')
+    global focal_person, focal_dog, focal_cat, focal_car, focal_bicycle
+    
+    obs = Detect()
+    
+    person_width_px, focal_person = obs.read_focal('weights/v5lite-g.pt', 'ref/50.jpg', 0, obs.PERSON_WIDTH)
+    dog_width_px, focal_dog = obs.read_focal('weights/v5lite-g.pt', 'ref/dog50.jpg', 16, obs.DOG_WIDTH)
+    cat_width_px, focal_cat = obs.read_focal('weights/v5lite-g.pt', 'ref/dog50.jpg', 16, obs.CAT_WIDTH)
+    car_width_px, focal_car = obs.read_focal('weights/v5lite-g.pt', 'ref/car.jpg', 2, obs.CAR_WIDTH)
+    bicycle_width_px, focal_bicycle = obs.read_focal('weights/v5lite-g.pt', 'ref/bicycle.jpg', 1, obs.BICYCLE_WIDTH)
+    
+    print(f'Person focal length: {focal_person}')
+    print(f'Dog focal length: {focal_dog}')
+    
+    print(f'Person width: {person_width_px}')
+    print(f'Dog width: {dog_width_px}')
+    
+    print(f'Cat focal length: {focal_cat}')
+    print(f'Cat width: {cat_width_px}')
+    
+    print(f'Car focal length: {focal_car}')
+    print(f'Car width: {car_width_px}')
+    
+    print(f'Bicycle focal length: {focal_bicycle}')
+    print(f'Bicycle width: {bicycle_width_px}')
+    
+    obs.config('weights/vig-model.pt', 'test_2.mp4', [0,1,2,13,15,16], False, True)
 
     obs.detect()
 

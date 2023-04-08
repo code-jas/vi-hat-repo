@@ -25,3 +25,4 @@ Detect.py:
 
 Test
 python test.py --weights weights/vih-model.pt --data vih-dataset/data.yaml --verbose --name addPerClass
+python test.py --weights weights/wcm-model.pt --data wcm-dataset/data.yaml --verbose --name addPerClass

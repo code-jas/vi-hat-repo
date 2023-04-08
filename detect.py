@@ -249,8 +249,10 @@ class Detect:
                             if position == "left":
                                 print("Left")
                                 # requests.get("http://192.168.4.4/left/active")
+                                # requests.get("http://192.168.4.4/left/active")
                             elif position == "right":
                                 print("Right")
+                                # requests.get("http://192.168.4.1/right/active")
                                 # requests.get("http://192.168.4.1/right/active")
                             else:
                                 print("Center")

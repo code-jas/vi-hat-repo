@@ -19,10 +19,10 @@ from utils.vi_hat import main_req
 import requests
 import threading
 
-engine = pyttsx3.init()
-voice = engine.getProperty('voices')  # get the available voices
-engine.setProperty('voice', voice[1].id)
-engine.say("Hello, I am Vi-Hat. I am ready to help you.")
+# engine = pyttsx3.init()
+# voice = engine.getProperty('voices')  # get the available voices
+# engine.setProperty('voice', voice[1].id)
+# engine.say("Hello, I am Vi-Hat. I am ready to help you.")
 
 class Detect:
     def __init__(self):
@@ -71,12 +71,13 @@ class Detect:
         
         return distance
 
-    def speak_warning(self, str):
-        if not engine._inLoop:
-            engine.say(str)
-            engine.runAndWait()
+
 
     def detect(self, save_img=False):
+        engine = pyttsx3.init()
+        voice = engine.getProperty('voices')  # get the available voices
+        engine.setProperty('voice', voice[1].id)
+        
         source, weights, view_img, save_txt, imgsz = self.opt.source, self.opt.weights, self.opt.view_img, self.opt.save_txt, self.opt.img_size
         save_img = not self.opt.nosave and not source.endswith(
             '.txt')  # save inference images
@@ -299,6 +300,11 @@ class Detect:
             print(f"Results saved to {save_dir}{s}")
 
         print(f'Done. ({time.time() - t0:.3f}s)')
+        
+    def speak_warning(self, str, engine):
+        if not engine._inLoop:
+            engine.say(str)
+            engine.runAndWait()
 
     def config(self, weights, source, classes, read, view_img):
         self.opt.weights = weights

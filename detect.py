@@ -4,6 +4,7 @@ from pathlib import Path
 import cv2
 import torch
 import torch.backends.cudnn as cudnn
+import os
 
 from numpy import random
 
@@ -23,6 +24,8 @@ import threading
 # voice = engine.getProperty('voices')  # get the available voices
 # engine.setProperty('voice', voice[1].id)
 # engine.say("Hello, I am Vi-Hat. I am ready to help you.")
+
+os.environ['OPENBLAS_NUM_THREADS'] = '1'
 
 class Detect:
     def __init__(self):
